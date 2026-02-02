@@ -1,52 +1,63 @@
-# Flash Loan Arbitrage — Ethereum Mainnet
+# Flash Loan Arbitrage — Arbitrum
 
-Smart contract infrastructure for executing atomic flash loan arbitrage across decentralized exchanges on Ethereum L1.
+Smart contract infrastructure for executing atomic flash loan arbitrage on Arbitrum One. Uses Balancer flash loans to borrow capital and routes trades across Uniswap V3 and V2-style DEXs on the Arbitrum network.
 
-Borrows via DAI flash mint, executes multi-hop swaps across Uniswap V2, Uniswap V3, and SushiSwap, and repays within a single transaction. If the trade is not profitable after gas, the entire transaction reverts. No capital at risk.
+Lower gas costs on L2 make smaller spreads profitable. Same atomic execution guarantees as L1.
 
 ## How It Works
 
-1. Contract initiates a DAI flash mint (zero-fee borrow)
-2. Swaps DAI for a target token on the lower-priced DEX
-3. Sells the target token on the higher-priced DEX
-4. Repays the flash mint
-5. Profit remains in the contract
+1. Contract requests a flash loan from the Balancer Vault
+2. Executes a buy on the lower-priced DEX
+3. Executes a sell on the higher-priced DEX
+4. Repays the Balancer flash loan (zero fee)
+5. Profit stays in the contract
 
-All four steps execute atomically in one transaction. If step 4 cannot be satisfied (meaning the arb was not profitable), the EVM reverts the entire sequence. Nothing is lost.
+The entire sequence is atomic. If the arb is not profitable, the transaction reverts and no funds are lost.
 
 ## Architecture
 
-The contract supports three execution paths:
+### Why Balancer on Arbitrum
 
-- **V2 to V2:** Uniswap V2 vs SushiSwap. Classic AMM arbitrage between identical pair pools with different reserves.
-- **V3 fee tier arbitrage:** Same pair on Uniswap V3 but across different fee tiers (0.05%, 0.3%, 1%). Price discrepancies arise from concentrated liquidity positions.
-- **V3 to V2 cross-protocol:** Buy on one protocol, sell on the other. Exploits structural pricing differences between constant-product and concentrated liquidity AMMs.
+Aave V3 is available on Arbitrum but charges a 0.05% flash loan premium. Balancer Vault flash loans are free. On high-frequency low-margin arbitrage, that fee difference is the difference between profitable and not.
+
+### Execution Strategies
+
+- **V3 fee tier arbitrage:** Same token pair across different Uniswap V3 fee tiers. Concentrated liquidity creates persistent price discrepancies between the 0.05%, 0.3%, and 1% pools.
+- **V3 to V2 cross-protocol:** Buy on Uniswap V3, sell on a V2 router (or vice versa). Structural pricing differences between AMM types.
+- **Multi-hop routing:** For pairs without deep direct liquidity, route through intermediate tokens to capture larger effective spreads.
 
 ### Key Design Decisions
 
-- **DAI flash mint over Aave/dYdX flash loans:** Zero fee. Aave charges 0.09%. On a 100 ETH arb, that is real money.
-- **Executor whitelist:** Owner can authorize multiple bot addresses without transferring ownership.
-- **Pause mechanism:** Kill switch for the contract without needing to withdraw funds first.
-- **ReentrancyGuard:** Defense in depth on all external execution paths.
+- **Balancer Vault as flash loan source:** Zero-fee flash loans on Arbitrum.
+- **Approved router mapping:** Owner whitelists V2 routers to prevent unauthorized contract interactions.
+- **Minimum profit enforcement:** Every arb function takes a `minProfit` parameter. If the realized profit is below this threshold after execution, the transaction reverts.
+- **Owner-only execution:** All arb functions are restricted to the contract owner to prevent front-running of discovered opportunities.
 
-## Supported DEXs
+## Contracts
 
-| DEX | Type | Address |
-|-----|------|---------|
-| Uniswap V2 | Constant Product AMM | `0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D` |
-| SushiSwap | Constant Product AMM | `0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F` |
-| Uniswap V3 | Concentrated Liquidity | `0xE592427A0AEce92De3Edee1F18E0157C05861564` |
+| Contract | Purpose |
+|----------|---------|
+| `FlashArbitrageArbitrum.sol` | Core arbitrage logic with Balancer flash loan integration |
+
+## Key Addresses (Arbitrum One)
+
+| Protocol | Address |
+|----------|---------|
+| Balancer Vault | `0xBA12222222228d8Ba445958a75a0704d566BF2C8` |
+| Uniswap V3 SwapRouter | `0xE592427A0AEce92De3Edee1F18E0157C05861564` |
 
 ## Stack
 
 - Solidity 0.8.20
-- OpenZeppelin (Ownable, ReentrancyGuard)
+- Balancer V2 Vault (flash loans)
+- Uniswap V3 (concentrated liquidity)
 - Hardhat
 - ethers.js
+- Arbitrum One / Arbitrum Sepolia
 
 ## Disclaimer
 
-This is research and educational code. MEV extraction on Ethereum mainnet is dominated by sophisticated searchers running custom infrastructure. This contract demonstrates the architecture and mechanics of flash loan arbitrage.
+This is research and educational code. Flash loan arbitrage on Arbitrum, like all MEV activity, operates in a competitive environment. This contract demonstrates the architecture and mechanics of L2 flash loan arbitrage.
 
 ## License
 
