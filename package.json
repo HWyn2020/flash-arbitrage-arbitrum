@@ -1,0 +1,20 @@
+{
+    "name": "erc20-emission-token",
+    "version": "1.0.0",
+    "description": "ERC20 token with capped supply, owner-only minting, and pull-based emission rewards on Arbitrum",
+    "scripts": {
+        "compile": "npx hardhat compile",
+        "test": "npx hardhat test",
+        "deploy:sepolia": "npx hardhat run scripts/deploy.cjs --network arbitrumSepolia",
+        "deploy:mainnet": "npx hardhat run scripts/deploy.cjs --network arbitrumOne",
+        "verify": "npx hardhat verify --network arbitrumOne"
+    },
+    "devDependencies": {
+        "hardhat": "2.22.0",
+        "@nomicfoundation/hardhat-toolbox": "4.0.0",
+        "@openzeppelin/contracts": "5.0.1",
+        "dotenv": "16.3.1"
+    },
+    "author": "HWyn2020",
+    "license": "MIT"
+}
